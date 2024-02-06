@@ -1,35 +1,58 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 
 package com.example.myapplication
 
+import android.Manifest
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeParseException
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.annotation.SuppressLint
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Icon
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import com.example.myapplication.data.ExamEntity
 import com.example.myapplication.presentation.ExamViewModel
 import com.example.myapplication.ui.theme.ExamsDateTheme
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 import dagger.hilt.android.AndroidEntryPoint
+import java.security.AllPermission
 import java.util.UUID
+import kotlin.random.Random
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -49,15 +72,29 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalPermissionsApi::class)
 @RequiresApi(Build.VERSION_CODES.O)
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun ExamListScreen() {
 
+    val context = LocalContext.current
+
     val viewModel = hiltViewModel<ExamViewModel>()
     val examUiState = viewModel.examUiState.collectAsState().value
 
     val showDialog = remember { mutableStateOf(false) }
+    var notificationDialog = remember { mutableStateOf(false) }
+
+
+    val postNotificationPermission=
+        rememberPermissionState(permission = Manifest.permission.POST_NOTIFICATIONS)
+
+    LaunchedEffect(key1 = true ){
+        if(!postNotificationPermission.status.isGranted){
+            postNotificationPermission.launchPermissionRequest()
+        }
+    }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Sınav Takip Uygulaması") }) },
@@ -70,12 +107,36 @@ fun ExamListScreen() {
         if (showDialog.value) {
             AddExamDialog(showDialog, viewModel::insertExam)
         }
-
-        LazyColumn(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 72.dp)
+        if (notificationDialog.value) {
+            NotificationAddExamDialog(notificationDialog, examUiState.exams, context)
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp)
         ) {
-            items(examUiState.exams) { exam ->
-                ExamItem(exam)
+            LazyColumn(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 72.dp)
+                    .weight(1f)
+            ) {
+                items(examUiState.exams) { exam ->
+                    ExamItem(exam)
+                }
+            }
+
+            ElevatedButton(
+                onClick = { notificationDialog.value = true },
+                modifier = Modifier.padding(bottom = 8.dp),
+                colors = ButtonDefaults.elevatedButtonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
+                )
+            ) {
+                Text(
+                    text = "Bildirim Gonder",
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = Color.White
+                )
             }
         }
     }
@@ -96,7 +157,6 @@ fun ExamItem(exam: ExamEntity) {
     }
 }
 
-
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun AddExamDialog(showDialog: MutableState<Boolean>, onAddExam: (ExamEntity) -> Unit) {
@@ -109,7 +169,11 @@ fun AddExamDialog(showDialog: MutableState<Boolean>, onAddExam: (ExamEntity) -> 
         onDismissRequest = { showDialog.value = false },
         title = { Text(text = "Yeni Sınav Ekle") },
         text = {
-            Column {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            ) {
                 TextField(
                     value = name,
                     onValueChange = { name = it },
@@ -134,7 +198,7 @@ fun AddExamDialog(showDialog: MutableState<Boolean>, onAddExam: (ExamEntity) -> 
                     showDialog.value = false
                     errorText = ""
                 } else {
-                    errorText = "Lütfen geçerli bir tarih ve saat girin"
+                    errorText = "Lütfen geçerli bir tarih veya saat girin"
                 }
             }) {
                 Text("Ekle")
@@ -145,6 +209,95 @@ fun AddExamDialog(showDialog: MutableState<Boolean>, onAddExam: (ExamEntity) -> 
                 Text("İptal")
             }
         }
+    )
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
+@Composable
+fun NotificationAddExamDialog(
+    notificationDialog: MutableState<Boolean>,
+    list: List<ExamEntity>,
+    context: Context,
+) {
+
+    val selectedItem = remember { mutableStateOf("") }
+    val numberInput = remember { mutableStateOf("") }
+    val dropdownExpanded = remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = { notificationDialog.value = false },
+        title = { Text(text = "Bildirim  Gonder") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = selectedItem.value,
+                    onValueChange = { },
+                    label = { Text("Ders Adi") },
+                    trailingIcon = {
+                        Icon(
+                            Icons.Filled.ArrowDropDown,
+                            "dropdown",
+                            Modifier.clickable { dropdownExpanded.value = true })
+                    }
+                )
+                DropdownMenu(
+                    expanded = dropdownExpanded.value,
+                    onDismissRequest = { dropdownExpanded.value = false },
+                    offset = DpOffset(x = 10.dp, y = 20.dp)
+                ) {
+                    list.forEach { item ->
+                        DropdownMenuItem(
+                            onClick = {
+                                selectedItem.value = item.name
+                                dropdownExpanded.value = false
+                            }, text = { Text(text = item.name) }
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = numberInput.value,
+                    onValueChange = { numberInput.value = it },
+                    label = { Text("Zaman") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    suffix = { Text("Dakika") },
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                notificationDialog.value = false
+                showBasicNotification(context, "exam_channel", selectedItem.value, numberInput.value)
+            }
+            ) {
+                Text("Gonder")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { notificationDialog.value = false }) {
+                Text("İptal")
+            }
+        }
+    )
+}
+
+fun showBasicNotification(
+    context: Context,
+    channelId: String,
+    title: String,
+    content: String,
+) {
+    val notificationManager = context.getSystemService(NotificationManager::class.java)
+    val notification = NotificationCompat.Builder(context, channelId)
+        .setContentTitle("$title sinavi icin son cagri")
+        .setContentText("$content dakika kaldi")
+        .setSmallIcon(R.drawable.ic_launcher_foreground)
+        .setPriority(NotificationManager.IMPORTANCE_HIGH)
+        .setAutoCancel(true)
+        .build()
+
+    notificationManager.notify(
+        Random.nextInt(),
+        notification
     )
 }
 
@@ -168,8 +321,8 @@ fun isValidTime(timeStr: String): Boolean {
     }
 }
 
-
 @Preview
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun DefaultPreview() {
     ExamsDateTheme {
