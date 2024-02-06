@@ -1,0 +1,27 @@
+
+D
+app/build.gradle.kts,d/2/d2a4383452aad84a18429a5844d31330a012a9e6
+n
+>app/src/main/java/com/example/myapplication/data/ExamEntity.kt,a/f/af45e251240d160130bde76a0a62ef051e5b0130
+k
+;app/src/main/java/com/example/myapplication/data/ExamDao.kt,3/a/3a056b435bafc5daa8369c69d4381665175ed9b5
+p
+@app/src/main/java/com/example/myapplication/data/ExamDatabase.kt,3/e/3e6d59a1d0f94c29065920d715c89111a3b870c5
+r
+Bapp/src/main/java/com/example/myapplication/data/ExamRepository.kt,d/4/d4f190eee0dc13630ef304d54765377cdf91e17a
+y
+Iapp/src/main/java/com/example/myapplication/presentation/ExamViewModel.kt,6/0/60f1a20904293bcb1ea3901aad64725303dc99fb
+k
+;app/src/main/java/com/example/myapplication/MainActivity.kt,0/0/00ed33bb9fa3f2577abe71150520b83c93b6af18
+n
+>app/src/main/java/com/example/myapplication/HiltApplication.kt,5/1/514eb2b6db37d616271202ae5e0f5f5a161f4d1d
+P
+ app/src/main/AndroidManifest.xml,8/c/8c55c3ccc257e5907959013f99656e4c8ec3903e
+p
+@app/src/main/java/com/example/myapplication/di/DatabaseModule.kt,9/d/9de743c97a721f311a4dbce19b900bd81899b589
+r
+Bapp/src/main/java/com/example/myapplication/di/RepositoryModule.kt,6/6/662d4037a06d096e8a707e9f1ff4d39e0b6ef1c6
+k
+;app/src/main/java/com/example/myapplication/di/DaoModule.kt,f/6/f6477eae0642bf8ae91657d6227038d35449b530
+@
+build.gradle.kts,d/b/dbcff70658daf80b53ce624f6adcaa529df5ed8d
